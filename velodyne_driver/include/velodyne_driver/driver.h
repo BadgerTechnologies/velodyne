@@ -58,6 +58,7 @@ private:
     double rpm;                      ///< device rotation rate (RPMs)
     int cut_angle;                   ///< cutting angle in 1/100°
     double time_offset;              ///< time in seconds added to each velodyne time stamp
+    bool enabled;
   } config_;
 
   boost::shared_ptr<Input> input_;
