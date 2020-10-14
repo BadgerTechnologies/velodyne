@@ -50,10 +50,12 @@ inline float SQR(float val) { return val*val; }
   void RawData::setParameters(double min_range,
                               double max_range,
                               double view_direction,
-                              double view_width)
+                              double view_width,
+                              bool replace_out_of_range_with_max_range)
   {
     config_.min_range = min_range;
     config_.max_range = max_range;
+    config_.replace_out_of_range_with_max_range = replace_out_of_range_with_max_range;
 
     //converting angle parameters into the velodyne reference (rad)
     config_.tmp_min_angle = view_direction + view_width/2;
@@ -195,14 +197,20 @@ inline float SQR(float val) { return val*val; }
         union two_bytes tmp;
         tmp.bytes[0] = block.data[k];
         tmp.bytes[1] = block.data[k+1];
-        if (tmp.bytes[0]==0 &&tmp.bytes[1]==0 ) //no laser beam return
-        {
-          continue;
-        }
 
         float distance = tmp.uint * calibration_.distance_resolution_m;
         distance += corrections.dist_correction;
-        if (!pointInRange(distance)) continue;
+        if (!pointInRange(distance))
+        {
+          if (config_.replace_out_of_range_with_max_range)
+          {
+            distance = config_.max_range;
+          }
+          else
+          {
+            continue;
+          }
+        }
 
         /*condition added to avoid calculating points which are not
           in the interesting defined area (min_angle < area < max_angle)*/
@@ -382,8 +390,19 @@ inline float SQR(float val) { return val*val; }
           float distance = tmp.uint * calibration_.distance_resolution_m;
           distance += corrections.dist_correction;
 
-          // skip the point if out of range
-          if ( !pointInRange(distance)) continue;
+          if (!pointInRange(distance))
+          {
+            if (config_.replace_out_of_range_with_max_range)
+            {
+	    ROS_WARN_STREAM_THROTTLE(60, "Replace out of range value (" << distance << ") with " << config_.max_range);
+              distance = config_.max_range;
+            }
+            else
+            {
+              // skip the point if out of range
+              continue;
+            }
+          }
 
           /** correct for the laser rotation as a function of timing during the firings **/
           azimuth_corrected_f = azimuth + (azimuth_diff * ((dsr*VLP16_DSR_TOFFSET) + (firing*VLP16_FIRING_TOFFSET)) / VLP16_BLOCK_TDURATION);
@@ -399,9 +418,6 @@ inline float SQR(float val) { return val*val; }
                || azimuth_corrected >= config_.min_angle))){
 
             // convert polar coordinates to Euclidean XYZ
-            float distance = tmp.uint * calibration_.distance_resolution_m;
-            distance += corrections.dist_correction;
-            
             float cos_vert_angle = corrections.cos_vert_correction;
             float sin_vert_angle = corrections.sin_vert_correction;
             float cos_rot_correction = corrections.cos_rot_correction;

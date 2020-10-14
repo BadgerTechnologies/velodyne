@@ -56,7 +56,8 @@ namespace velodyne_pointcloud
   {
     ROS_INFO_STREAM("Reconfigure request.");
     data_->setParameters(config.min_range, config.max_range, 
-                         config.view_direction, config.view_width);
+                         config.view_direction, config.view_width,
+                         config.replace_out_of_range_with_max_range);
     config_.frame_id = tf::resolve(tf_prefix_, config.frame_id);
     ROS_INFO_STREAM("Target frame ID: " << config_.frame_id);
   }
