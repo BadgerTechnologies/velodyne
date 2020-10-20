@@ -150,7 +150,7 @@ namespace velodyne_rawdata
     void unpack(const velodyne_msgs::VelodynePacket &pkt, DataContainerBase& data);
     
     void setParameters(double min_range, double max_range, double view_direction,
-                       double view_width);
+                       double view_width, bool replace_out_of_range_with_max_range);
 
     int scansPerPacket() const;
 
@@ -163,6 +163,7 @@ namespace velodyne_rawdata
       double min_range;                ///< minimum range to publish
       int min_angle;                   ///< minimum angle to publish
       int max_angle;                   ///< maximum angle to publish
+      bool replace_out_of_range_with_max_range; ///< replace out of range with max range
       
       double tmp_min_angle;
       double tmp_max_angle;
