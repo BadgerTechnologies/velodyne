@@ -297,6 +297,7 @@ inline float SQR(float val) { return val*val; }
         
         float x, y, z;
         float intensity;
+        bool force_invalid_intensity = false;
         const uint8_t laser_number  = j + bank_origin;
         float time = 0;
 
@@ -334,6 +335,7 @@ inline float SQR(float val) { return val*val; }
           if (!data.pointInRange(distance) && config_.replace_out_of_range_with_max_range)
           {
             distance = config_.max_range;
+            force_invalid_intensity = true;
           }
 
           float cos_vert_angle = corrections.cos_vert_correction;
@@ -431,6 +433,7 @@ inline float SQR(float val) { return val*val; }
           intensity = (intensity < min_intensity) ? min_intensity : intensity;
           intensity = (intensity > max_intensity) ? max_intensity : intensity;
 
+          if (force_invalid_intensity) intensity = nanf("");
           data.addPoint(x_coord, y_coord, z_coord, corrections.laser_ring, raw->blocks[i].rotation, distance, intensity, time);
         }
       }
@@ -497,6 +500,7 @@ inline float SQR(float val) { return val*val; }
       for (int firing=0, k=0; firing < VLP16_FIRINGS_PER_BLOCK; firing++){
         for (int dsr=0; dsr < VLP16_SCANS_PER_FIRING; dsr++, k+=RAW_SCAN_SIZE){
           velodyne_pointcloud::LaserCorrection &corrections = calibration_.laser_corrections[dsr];
+          bool force_invalid_intensity = false;
 
           /** Position Calculation */
           union two_bytes tmp;
@@ -522,6 +526,7 @@ inline float SQR(float val) { return val*val; }
             if (!data.pointInRange(distance) && config_.replace_out_of_range_with_max_range)
             {
               distance = config_.max_range;
+              force_invalid_intensity = true;
             }
 
             float cos_vert_angle = corrections.cos_vert_correction;
@@ -620,6 +625,7 @@ inline float SQR(float val) { return val*val; }
             if (timing_offsets.size())
               time = timing_offsets[block][firing * 16 + dsr] + time_diff_start_to_this_packet;
 
+            if (force_invalid_intensity) intensity = nanf("");
             data.addPoint(x_coord, y_coord, z_coord, corrections.laser_ring, azimuth_corrected, distance, intensity, time);
           }
         }
