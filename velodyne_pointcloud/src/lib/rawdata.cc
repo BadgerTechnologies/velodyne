@@ -52,10 +52,12 @@ inline float SQR(float val) { return val*val; }
   void RawData::setParameters(double min_range,
                               double max_range,
                               double view_direction,
-                              double view_width)
+                              double view_width,
+                              bool replace_out_of_range_with_max_range)
   {
     config_.min_range = min_range;
     config_.max_range = max_range;
+    config_.replace_out_of_range_with_max_range = replace_out_of_range_with_max_range;
 
     //converting angle parameters into the velodyne reference (rad)
     config_.tmp_min_angle = view_direction + view_width/2;
@@ -385,7 +387,7 @@ void RawData::setupAzimuthCache()
             time = timing_offsets[i][j] + time_diff_start_to_this_packet;
           }
 
-          if (tmp.uint == 0) // no valid laser beam return
+          if (tmp.uint == 0 && !config_.replace_out_of_range_with_max_range) // no valid laser beam return
           {
             // call to addPoint is still required since output could be organized
             data.addPoint(nanf(""), nanf(""), nanf(""), corrections.laser_ring, raw->blocks[i].rotation, nanf(""), nanf(""), time);
@@ -394,7 +396,11 @@ void RawData::setupAzimuthCache()
 
           float distance = tmp.uint * calibration_.distance_resolution_m;
           distance += corrections.dist_correction;
-  
+          if (!data.pointInRange(distance) && config_.replace_out_of_range_with_max_range)
+          {
+            distance = config_.max_range;
+          }
+
           float cos_vert_angle = corrections.cos_vert_correction;
           float sin_vert_angle = corrections.sin_vert_correction;
           float cos_rot_correction = corrections.cos_rot_correction;
@@ -712,7 +718,11 @@ void RawData::unpack_vls128(const velodyne_msgs::VelodynePacket &pkt, DataContai
             // convert polar coordinates to Euclidean XYZ
             float distance = tmp.uint * calibration_.distance_resolution_m;
             distance += corrections.dist_correction;
-            
+            if (!data.pointInRange(distance) && config_.replace_out_of_range_with_max_range)
+            {
+              distance = config_.max_range;
+            }
+
             float cos_vert_angle = corrections.cos_vert_correction;
             float sin_vert_angle = corrections.sin_vert_correction;
             float cos_rot_correction = corrections.cos_rot_correction;
