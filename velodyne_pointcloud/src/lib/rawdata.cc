@@ -399,9 +399,6 @@ inline float SQR(float val) { return val*val; }
                || azimuth_corrected >= config_.min_angle))){
 
             // convert polar coordinates to Euclidean XYZ
-            float distance = tmp.uint * calibration_.distance_resolution_m;
-            distance += corrections.dist_correction;
-            
             float cos_vert_angle = corrections.cos_vert_correction;
             float sin_vert_angle = corrections.sin_vert_correction;
             float cos_rot_correction = corrections.cos_rot_correction;
