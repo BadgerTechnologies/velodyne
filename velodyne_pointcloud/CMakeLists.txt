@@ -5,6 +5,7 @@ set(${PROJECT_NAME}_CATKIN_DEPS
     angles
     nodelet
     pcl_ros
+    rosbag
     roscpp
     roslib
     sensor_msgs
