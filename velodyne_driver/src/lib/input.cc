@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <endian.h>
 #include <velodyne_driver/input.h>
 
 namespace velodyne_driver
@@ -70,6 +71,9 @@ namespace velodyne_driver
     Input(private_nh, port)
   {
     sockfd_ = -1;
+    adj_count_ = 0;
+    hardware_clock_ = 0.0;
+    last_hardware_time_stamp_ = 0;
     
     if (!devip_str_.empty()) {
       inet_aton(devip_str_.c_str(),&devip_);
@@ -111,11 +115,63 @@ namespace velodyne_driver
     (void) close(sockfd_);
   }
 
+  /** @brief get Synchronized Timestamp */
+  ros::Time InputSocket::getSynchronizedTime(uint32_t hardware_time_stamp, ros::Time system_time_stamp)
+  {
+    ros::Time stamp;
+    stamp = system_time_stamp;
+
+    const uint32_t t1 = hardware_time_stamp;
+    const uint32_t t0 = last_hardware_time_stamp_;
+    uint32_t dt;
+    if (t1 >= t0)
+    {
+      dt = t1 - t0;
+    }
+    else
+    {
+      // Velodyne stamps wrap at 1 hour (3,600,000,000 microseconds), not at 32-bits
+      const uint32_t velodyne_max_time = 3600000000ul;
+      dt = (t1 + velodyne_max_time) - t0;
+    }
+    double delta = static_cast<double>(dt)/1000000.0;
+    hardware_clock_ += delta;
+    double cur_adj = stamp.toSec() - hardware_clock_;
+    if (adj_count_ > 0)
+    {
+      const double adj_alpha = .01;
+      hardware_clock_adj_ = adj_alpha*cur_adj+(1.0-adj_alpha)*hardware_clock_adj_;
+    }
+    else
+    {
+      // Initialize the EMA
+      hardware_clock_adj_ = cur_adj;
+    }
+    adj_count_++;
+    last_hardware_time_stamp_ = hardware_time_stamp;
+
+    // Once hardware clock is synchronized, use it.
+    // Otherwise just return the input system_time_stamp as ros::Time.
+    if (adj_count_ > 100)
+    {
+      stamp.fromSec(hardware_clock_+hardware_clock_adj_);
+      // If the time error is large a clock warp has occurred.
+      // Reset the EMA and use the system time.
+      if (fabs((stamp-system_time_stamp).toSec()) > 0.1)
+      {
+        adj_count_ = 0;
+        hardware_clock_ = 0.0;
+        last_hardware_time_stamp_ = 0;
+        stamp = system_time_stamp;
+        ROS_INFO("%s: detected clock warp, reset EMA", __func__);
+      }
+    }
+    return stamp;
+  }
+
   /** @brief Get one velodyne packet. */
   int InputSocket::getPacket(velodyne_msgs::VelodynePacket *pkt, const double time_offset)
   {
-    double time1 = ros::Time::now().toSec();
-
     struct pollfd fds[1];
     fds[0].fd = sockfd_;
     fds[0].events = POLLIN;
@@ -199,10 +255,8 @@ namespace velodyne_driver
                          << nbytes << " bytes");
       }
 
-    // Average the times at which we begin and end reading.  Use that to
-    // estimate when the scan occurred. Add the time offset.
-    double time2 = ros::Time::now().toSec();
-    pkt->stamp = ros::Time((time2 + time1) / 2.0 + time_offset);
+    uint32_t hardware_stamp = le32toh(*reinterpret_cast<uint32_t*>(&pkt->data[1200]));
+    pkt->stamp = getSynchronizedTime(hardware_stamp, ros::Time::now()) + ros::Duration(time_offset);
 
     return 0;
   }
@@ -263,6 +317,13 @@ namespace velodyne_driver
   InputPCAP::~InputPCAP(void)
   {
     pcap_close(pcap_);
+  }
+
+  /** @brief get Synchronized Timestamp */
+  ros::Time InputPCAP::getSynchronizedTime(uint32_t hardware_time_stamp, ros::Time system_time_stamp)
+  {
+    // Nothing to do for PCAP input
+    return system_time_stamp;
   }
 
   /** @brief Get one velodyne packet. */

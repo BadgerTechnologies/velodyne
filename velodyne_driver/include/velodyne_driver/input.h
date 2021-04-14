@@ -52,6 +52,10 @@ namespace velodyne_driver
     Input(ros::NodeHandle private_nh, uint16_t port);
     virtual ~Input() {}
 
+    /** @brief get Synchronized Timestamp */
+    virtual ros::Time getSynchronizedTime(uint32_t hardware_time_stamp,
+                                          ros::Time system_time_stamp) = 0;
+
     /** @brief Read one Velodyne packet.
      *
      * @param pkt points to VelodynePacket message
@@ -77,6 +81,8 @@ namespace velodyne_driver
                 uint16_t port = DATA_PORT_NUMBER);
     virtual ~InputSocket();
 
+    virtual ros::Time getSynchronizedTime(uint32_t hardware_time_stamp,
+                                          ros::Time system_time_stamp);
     virtual int getPacket(velodyne_msgs::VelodynePacket *pkt, 
                           const double time_offset);
     void setDeviceIP( const std::string& ip );
@@ -85,6 +91,11 @@ namespace velodyne_driver
   private:
     int sockfd_;
     in_addr devip_;
+    // Used for clock synchronziation
+    double hardware_clock_;
+    uint32_t last_hardware_time_stamp_;
+    double hardware_clock_adj_;
+    uint64_t adj_count_;
   };
 
 
@@ -105,6 +116,8 @@ namespace velodyne_driver
               double repeat_delay=0.0);
     virtual ~InputPCAP();
 
+    virtual ros::Time getSynchronizedTime(uint32_t hardware_time_stamp,
+                                          ros::Time system_time_stamp);
     virtual int getPacket(velodyne_msgs::VelodynePacket *pkt, 
                           const double time_offset);
     void setDeviceIP( const std::string& ip );
