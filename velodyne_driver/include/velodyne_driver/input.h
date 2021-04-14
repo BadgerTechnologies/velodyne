@@ -75,6 +75,19 @@ public:
   Input(ros::NodeHandle private_nh, uint16_t port);
   virtual ~Input() {}
 
+  /** @brief get Synchronized Timestamp from hardware stamp.
+   *
+   * Return a system timestamp representing the hardware stamp.
+   * Only used when not directly using GPS time.
+   *
+   * @param hardware_time_stamp hardware time from the Velodyne
+   * @param system_time_stamp current system time stamp
+   *
+   * @returns system time that corresponds to the hardware stamp.
+   */
+  virtual ros::Time getSynchronizedTime(uint32_t hardware_time_stamp,
+                                        ros::Time system_time_stamp) = 0;
+
   /** @brief Read one Velodyne packet.
    *
    * @param pkt points to VelodynePacket message
@@ -91,6 +104,7 @@ protected:
   uint16_t port_;
   std::string devip_str_;
   bool gps_time_;
+  bool synchronize_time_; // Track the hardware clock, only used when gps_time_ is false
 };
 
 /** @brief Live Velodyne input from socket. */
@@ -101,6 +115,8 @@ public:
               uint16_t port = DATA_PORT_NUMBER);
   virtual ~InputSocket();
 
+  virtual ros::Time getSynchronizedTime(uint32_t hardware_time_stamp,
+                                        ros::Time system_time_stamp);
   virtual int getPacket(velodyne_msgs::VelodynePacket *pkt,
                         const double time_offset);
   void setDeviceIP(const std::string& ip);
@@ -108,6 +124,11 @@ public:
 private:
   int sockfd_;
   in_addr devip_;
+  // Used for hardware clock synchronziation when GPS clock unavailable
+  double hardware_clock_;
+  uint32_t last_hardware_time_stamp_;
+  double hardware_clock_adj_;
+  uint64_t adj_count_;
 };
 
 
@@ -128,6 +149,8 @@ public:
             double repeat_delay = 0.0);
   virtual ~InputPCAP();
 
+  virtual ros::Time getSynchronizedTime(uint32_t hardware_time_stamp,
+                                        ros::Time system_time_stamp);
   virtual int getPacket(velodyne_msgs::VelodynePacket *pkt,
                         const double time_offset);
   void setDeviceIP(const std::string& ip);
