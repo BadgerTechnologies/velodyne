@@ -53,6 +53,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <endian.h>
 #include <velodyne_driver/input.h>
 #include <velodyne_driver/time_conversion.hpp>
 
@@ -76,6 +77,11 @@ namespace velodyne_driver
   {
     private_nh.param("device_ip", devip_str_, std::string(""));
     private_nh.param("gps_time", gps_time_, false);
+    private_nh.param("synchronize_time", synchronize_time_, false);
+    if (!gps_time_ && synchronize_time_)
+    {
+      ROS_INFO("Synchronizing hardware timestamps to system clock with exponential moving average.");
+    }
     if (!devip_str_.empty())
       ROS_INFO_STREAM("Only accepting packets from IP address: "
                       << devip_str_);
@@ -94,6 +100,9 @@ namespace velodyne_driver
     Input(private_nh, port)
   {
     sockfd_ = -1;
+    adj_count_ = 0;
+    hardware_clock_ = 0.0;
+    last_hardware_time_stamp_ = 0;
     
     if (!devip_str_.empty()) {
       inet_aton(devip_str_.c_str(),&devip_);
@@ -133,6 +142,60 @@ namespace velodyne_driver
   InputSocket::~InputSocket(void)
   {
     (void) close(sockfd_);
+  }
+
+  /** @brief get Synchronized Timestamp using an exponential moving average synchronization. */
+  ros::Time InputSocket::getSynchronizedTime(uint32_t hardware_time_stamp, ros::Time system_time_stamp)
+  {
+    ros::Time stamp;
+    stamp = system_time_stamp;
+
+    const uint32_t t1 = hardware_time_stamp;
+    const uint32_t t0 = last_hardware_time_stamp_;
+    uint32_t dt;
+    if (t1 >= t0)
+    {
+      dt = t1 - t0;
+    }
+    else
+    {
+      // Velodyne stamps wrap at 1 hour (3,600,000,000 microseconds), not at 32-bits
+      const uint32_t velodyne_max_time = 3600000000ul;
+      dt = (t1 + velodyne_max_time) - t0;
+    }
+    double delta = static_cast<double>(dt)/1000000.0;
+    hardware_clock_ += delta;
+    double cur_adj = stamp.toSec() - hardware_clock_;
+    if (adj_count_ > 0)
+    {
+      const double adj_alpha = .01;
+      hardware_clock_adj_ = adj_alpha*cur_adj+(1.0-adj_alpha)*hardware_clock_adj_;
+    }
+    else
+    {
+      // Initialize the EMA
+      hardware_clock_adj_ = cur_adj;
+    }
+    adj_count_++;
+    last_hardware_time_stamp_ = hardware_time_stamp;
+
+    // Once hardware clock is synchronized, use it.
+    // Otherwise just return the input system_time_stamp as ros::Time.
+    if (adj_count_ > 100)
+    {
+      stamp.fromSec(hardware_clock_+hardware_clock_adj_);
+      // If the time error is large a clock warp has occurred.
+      // Reset the EMA and use the system time.
+      if (fabs((stamp-system_time_stamp).toSec()) > 0.1)
+      {
+        adj_count_ = 0;
+        hardware_clock_ = 0.0;
+        last_hardware_time_stamp_ = 0;
+        stamp = system_time_stamp;
+        ROS_INFO("%s: detected clock warp, reset EMA", __func__);
+      }
+    }
+    return stamp;
   }
 
   /** @brief Get one velodyne packet. */
@@ -224,10 +287,15 @@ namespace velodyne_driver
       }
 
     if (!gps_time_) {
-      // Average the times at which we begin and end reading.  Use that to
-      // estimate when the scan occurred. Add the time offset.
-      double time2 = ros::Time::now().toSec();
-      pkt->stamp = ros::Time((time2 + time1) / 2.0 + time_offset);
+      if (synchronize_time_) {
+        uint32_t hardware_stamp = le32toh(*reinterpret_cast<uint32_t*>(&pkt->data[1200]));
+        pkt->stamp = getSynchronizedTime(hardware_stamp, ros::Time::now()) + ros::Duration(time_offset);
+      } else {
+        // Average the times at which we begin and end reading.  Use that to
+        // estimate when the scan occurred. Add the time offset.
+        double time2 = ros::Time::now().toSec();
+        pkt->stamp = ros::Time((time2 + time1) / 2.0 + time_offset);
+      }
     } else {
       // time for each packet is a 4 byte uint located starting at offset 1200 in
       // the data packet
@@ -293,6 +361,13 @@ namespace velodyne_driver
   InputPCAP::~InputPCAP(void)
   {
     pcap_close(pcap_);
+  }
+
+  /** @brief get Synchronized Timestamp. For PCAP, simply return the input system_time_stamp. */
+  ros::Time InputPCAP::getSynchronizedTime(uint32_t hardware_time_stamp, ros::Time system_time_stamp)
+  {
+    // Nothing to do for PCAP input
+    return system_time_stamp;
   }
 
   /** @brief Get one velodyne packet. */
