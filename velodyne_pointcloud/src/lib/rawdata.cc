@@ -675,22 +675,12 @@ void RawData::unpack_vls128(const velodyne_msgs::VelodynePacket &pkt, DataContai
       // Calculate difference between current and next block's azimuth angle.
       azimuth = (float)(raw->blocks[block].rotation);
       if (block < (BLOCKS_PER_PACKET-1)){
-	raw_azimuth_diff = raw->blocks[block+1].rotation - raw->blocks[block].rotation;
-        azimuth_diff = (float)((36000 + raw_azimuth_diff)%36000);
-	// some packets contain an angle overflow where azimuth_diff < 0 
-	if(raw_azimuth_diff < 0)//raw->blocks[block+1].rotation - raw->blocks[block].rotation < 0)
-	  {
-	    ROS_WARN_STREAM_THROTTLE(60, "Packet containing angle overflow, first angle: " << raw->blocks[block].rotation << " second angle: " << raw->blocks[block+1].rotation);
-	    // if last_azimuth_diff was not zero, we can assume that the velodyne's speed did not change very much and use the same difference
-	    if(last_azimuth_diff > 0){
-	      azimuth_diff = last_azimuth_diff;
-	    }
-	    // otherwise we are not able to use this data
-	    // TODO: we might just not use the second 16 firings
-	    else{
-	      continue;
-	    }
-	  }
+        raw_azimuth_diff = static_cast<int>(raw->blocks[block+1].rotation) - static_cast<int>(raw->blocks[block].rotation);
+        // Handle roll over
+        if (raw_azimuth_diff < 0) {
+          raw_azimuth_diff += 36000;
+        }
+        azimuth_diff = static_cast<float>(raw_azimuth_diff);
         last_azimuth_diff = azimuth_diff;
       }else{
         azimuth_diff = last_azimuth_diff;
