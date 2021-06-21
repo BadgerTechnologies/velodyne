@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.0.2)
 project(velodyne_pointcloud)
 
 # Set minimum C++ standard to C++11
@@ -76,7 +76,7 @@ install(DIRECTORY launch/
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch)
 install(DIRECTORY params/
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/params)
-install(PROGRAMS scripts/gen_calibration.py
+catkin_install_python(PROGRAMS scripts/gen_calibration.py
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 roslint_cpp()
