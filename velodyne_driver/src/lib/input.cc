@@ -124,12 +124,20 @@ namespace velodyne_driver
     my_addr.sin_port = htons(port);          // port in network byte order
     my_addr.sin_addr.s_addr = INADDR_ANY;    // automatically fill in my IP
   
-    // compatibility with Spot Core EAP, reuse port 2368
-    int val = 1;
-    if(setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) == -1) {
-        perror("socketopt");
-        return;
-    }
+    /* Badger: remove this as it messes up unicast in some circumstances.
+     * SO_REUSEADDR on a UDP port means to share a multicast or broadcast port
+     * with other apps on the same host. However, it appears that in some cases
+     * when receiving from a unicast address, the data is never recieved if
+     * SO_REUSEADDR is set. For Badger we always setup the sensors to send to a
+     * specific address to avoid overwhelming other devices on the internal
+     * network with irrelevant data.
+     * // compatibility with Spot Core EAP, reuse port 2368
+     * int val = 1;
+     * if(setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) == -1) {
+     *     perror("socketopt");
+     *     return;
+     * }
+     */
 
     if (bind(sockfd_, (sockaddr *)&my_addr, sizeof(sockaddr)) == -1)
       {
