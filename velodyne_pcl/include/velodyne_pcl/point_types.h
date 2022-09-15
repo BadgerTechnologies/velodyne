@@ -53,6 +53,8 @@ struct PointXYZIRT
   float    intensity;                 ///< laser intensity reading
   uint16_t ring;                      ///< laser ring number
   float    time;                      ///< laser time reading
+  float    radius;                    ///< laser retrun distance
+  float    azimuth;                   ///< laser azimuth
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW     // ensure proper alignment
 }
 EIGEN_ALIGN16;
@@ -64,6 +66,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(velodyne_pcl::PointXYZIRT,
                                   (float, z, z)
                                   (float, intensity, intensity)
                                   (uint16_t, ring, ring)
-                                  (float, time, time))
+                                  (float, time, time)
+                                  (float, radius, radius)
+                                  (float, azimuth, azimuth))
 
 #endif  // VELODYNE_PCL_POINT_TYPES_H

@@ -9,15 +9,18 @@ OrganizedCloudXYZIRT::OrganizedCloudXYZIRT(
       const unsigned int num_lasers, const unsigned int scans_per_block)
     : DataContainerBase(
         max_range, min_range, target_frame, fixed_frame,
-        num_lasers, 0, false, scans_per_block, 6,
+        num_lasers, 0, false, scans_per_block, 8,
         "x", 1, sensor_msgs::PointField::FLOAT32,
         "y", 1, sensor_msgs::PointField::FLOAT32,
         "z", 1, sensor_msgs::PointField::FLOAT32,
         "intensity", 1, sensor_msgs::PointField::FLOAT32,
         "ring", 1, sensor_msgs::PointField::UINT16,
-        "time", 1, sensor_msgs::PointField::FLOAT32),
+        "time", 1, sensor_msgs::PointField::FLOAT32,
+        "radius", 1, sensor_msgs::PointField::FLOAT32,
+        "azimuth", 1, sensor_msgs::PointField::FLOAT32),
         iter_x(cloud, "x"), iter_y(cloud, "y"), iter_z(cloud, "z"),
-        iter_intensity(cloud, "intensity"), iter_ring(cloud, "ring"), iter_time(cloud, "time")
+        iter_intensity(cloud, "intensity"), iter_ring(cloud, "ring"), iter_time(cloud, "time"),
+        iter_radius(cloud, "radius"), iter_azimuth(cloud, "azimuth")
   {
   }
 
@@ -29,6 +32,8 @@ OrganizedCloudXYZIRT::OrganizedCloudXYZIRT(
     iter_ring = iter_ring + config_.init_width;
     iter_intensity = iter_intensity + config_.init_width;
     iter_time = iter_time + config_.init_width;
+    iter_radius = iter_radius + config_.init_width;
+    iter_azimuth = iter_azimuth + config_.init_width;
     ++cloud.height;
   }
 
@@ -40,11 +45,13 @@ OrganizedCloudXYZIRT::OrganizedCloudXYZIRT(
     iter_intensity = sensor_msgs::PointCloud2Iterator<float>(cloud, "intensity");
     iter_ring = sensor_msgs::PointCloud2Iterator<uint16_t >(cloud, "ring");
     iter_time = sensor_msgs::PointCloud2Iterator<float >(cloud, "time");
+    iter_radius = sensor_msgs::PointCloud2Iterator<float>(cloud, "radius");
+    iter_azimuth = sensor_msgs::PointCloud2Iterator<float>(cloud, "azimuth");
   }
 
 
   void OrganizedCloudXYZIRT::addPoint(float x, float y, float z,
-      const uint16_t ring, const uint16_t /*azimuth*/, const float distance, const float intensity, const float time)
+      const uint16_t ring, const uint16_t azimuth, const float distance, const float intensity, const float time)
   {
     /** The laser values are not ordered, the organized structure
      * needs ordered neighbour points. The right order is defined
@@ -62,6 +69,8 @@ OrganizedCloudXYZIRT::OrganizedCloudXYZIRT(
       *(iter_intensity+ring) = intensity;
       *(iter_ring+ring) = ring;
       *(iter_time+ring) = time;
+      *(iter_radius+ring) = distance;
+      *(iter_azimuth+ring) = (azimuth / 100.0) * (M_PI / 180.0);
     }
     else
     {
@@ -71,6 +80,8 @@ OrganizedCloudXYZIRT::OrganizedCloudXYZIRT(
       *(iter_intensity+ring) = nanf("");
       *(iter_ring+ring) = ring;
       *(iter_time+ring) = time;
+      *(iter_radius+ring) = nanf("");
+      *(iter_azimuth+ring) = azimuth;
     }
   }
 }
