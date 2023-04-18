@@ -11,15 +11,17 @@ PointcloudXYZIRT::PointcloudXYZIRT(
     const unsigned int scans_per_block)
     : DataContainerBase(
         max_range, min_range, target_frame, fixed_frame,
-        0, 1, true, scans_per_block, 6,
+        0, 1, true, scans_per_block, 7,
         "x", 1, sensor_msgs::PointField::FLOAT32,
         "y", 1, sensor_msgs::PointField::FLOAT32,
         "z", 1, sensor_msgs::PointField::FLOAT32,
         "intensity", 1, sensor_msgs::PointField::FLOAT32,
         "ring", 1, sensor_msgs::PointField::UINT16,
-        "time", 1, sensor_msgs::PointField::FLOAT32),
+        "time", 1, sensor_msgs::PointField::FLOAT32,
+        "distance", 1, sensor_msgs::PointField::FLOAT32),
         iter_x(cloud, "x"), iter_y(cloud, "y"), iter_z(cloud, "z"),
-        iter_ring(cloud, "ring"), iter_intensity(cloud, "intensity"), iter_time(cloud, "time")
+        iter_ring(cloud, "ring"), iter_intensity(cloud, "intensity"), iter_time(cloud, "time"),
+        iter_distance(cloud, "distance")
     {};
 
   void PointcloudXYZIRT::setup(const velodyne_msgs::VelodyneScan::ConstPtr& scan_msg){
@@ -30,6 +32,7 @@ PointcloudXYZIRT::PointcloudXYZIRT(
     iter_intensity = sensor_msgs::PointCloud2Iterator<float>(cloud, "intensity");
     iter_ring = sensor_msgs::PointCloud2Iterator<uint16_t >(cloud, "ring");
     iter_time = sensor_msgs::PointCloud2Iterator<float >(cloud, "time");
+    iter_distance = sensor_msgs::PointCloud2Iterator<float >(cloud, "distance");
   }
 
   void PointcloudXYZIRT::newLine()
@@ -49,6 +52,7 @@ PointcloudXYZIRT::PointcloudXYZIRT(
     *iter_ring = ring;
     *iter_intensity = intensity;
     *iter_time = time;
+    *iter_distance = distance;
 
     ++cloud.width;
     ++iter_x;
@@ -57,6 +61,7 @@ PointcloudXYZIRT::PointcloudXYZIRT(
     ++iter_ring;
     ++iter_intensity;
     ++iter_time;
+    ++iter_distance;
   }
 }
 
